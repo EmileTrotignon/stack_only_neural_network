@@ -172,7 +172,7 @@ public:
     }
 
     template<class R>
-    R fold(function<R(R, T)> f, R first_value)
+    R fold(function<R(R, T)> f, R first_value) const
     {
         R r = first_value;
         for (auto i:arr)
@@ -185,17 +185,35 @@ public:
         return r;
     }
 
-    T max()
+    template<class R>
+    Matrix<R, 1, H>
+    column_fold(function<Matrix<R, 1, H>(Matrix<R, 1, H>, Matrix<T, 1, H>)>, Matrix<R, 1, H> first_value) const
+    {
+        Matrix<R, 1, H> r = first_value;
+        for (size_t x = 0; x < W; x++)
+        {
+            r = f(r, column(x));
+        }
+        return r;
+    }
+
+    T max() const
     {
         return fold<T>(function([](T prec_max, T val)
                                 { return (val > prec_max) ? val : prec_max; }), at(0, 0));
 
     }
 
-    T sum()
+    T sum() const
     {
         return fold<T>(function([](T acc, T val)
                                 { return acc + val; }), 0);
+    }
+
+    Matrix<T, 1, H> column_sum() const
+    {
+        return column_fold<T>(function([](Matrix<T, 1, H> acc, Matrix<T, 1, H> val)
+                                       { return acc + val; }), {0});
     }
 
     string to_string() const

@@ -210,8 +210,21 @@ public:
         {
             each_column_is_input.column(x) = input;
         }
+
+        Matrix<double, size2, size1> ones({1});
         Matrix<double, size2, size1> d_weights =
                 2 * (prediction - expected_result) * prediction.fmap(function(sigmoid_derv)) * each_column_is_input;
+
+        Matrix<double, 1, size2> d_input =
+                2 * ((prediction - expected_result) * prediction.fmap(function(sigmoid_derv)) * weights).column_sum();
+        Matrix<double, 1, size2> d_biases =
+                2 * ((prediction - expected_result) * prediction.fmap(function(sigmoid_derv)) * ones).column_sum();
+
+        return tuple<Matrix<double, size2, size1>, Matrix<double, 1, size1>, Matrix<double, 1, size1>>(d_weights,
+                                                                                                       d_input,
+                                                                                                       d_biases);
+
+
     }
 };
 
