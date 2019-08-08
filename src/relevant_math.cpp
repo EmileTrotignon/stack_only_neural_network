@@ -11,5 +11,8 @@ double sigmoid(double input)
     return 1 / (1 + exp(-input));
 }
 
-
+double sigmoid_derv(double x_sigmoid)
+{
+    return x_sigmoid * (1 - x_sigmoid);
+}
 

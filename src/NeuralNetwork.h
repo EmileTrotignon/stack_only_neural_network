@@ -12,104 +12,19 @@
 #include <tuple>
 #include <random>
 #include <cmath>
+#include <cassert>
 #include "Matrix.h"
 #include "relevant_math.h"
-
-
+#include "RecTuple.h"
+#include "DNetwork.h"
+#include "NeuralNetworkBase.h"
+#include "NeuralNetworkInside.h"
 using namespace std;
 
-constexpr static double low_bound = -1;
-constexpr static double up_bound = 1;
-
-
-template<size_t size1, size_t size2>
-class D_Layer
-{
-public:
-    Matrix<double, size2, size1> d_weights;
-    Matrix<double, 1, size2> d_input;
-    Matrix<double, 1, size2> d_biases;
-
-    D_Layer(Matrix<double, size2, size1> d_weights_, Matrix<double, 1, size2> d_input_,
-            Matrix<double, 1, size2> d_biases_) : d_weights(d_weights_), d_biases(d_biases_), d_input(d_input_)
-    {
-
-    }
-
-};
-
-
-template<size_t... sizes>
-class D_Network
-{
-
-public:
-
-    D_Network() = delete;
-};
-
-template<size_t size1, size_t size2>
-class D_Network<size1, size2>
-{
-public:
-    D_Layer<size1, size2> d_layer;
-
-    explicit D_Network(D_Layer<size1, size2> d_layer_) : d_layer(d_layer_)
-    {
-
-    }
-
-    constexpr static size_t get_number_of_layers()
-    {
-        return 1;
-    };
-
-    constexpr static size_t last_size()
-    {
-        return size2;
-    }
-};
-
-template<size_t size1, size_t size2, size_t... sizes>
-class D_Network<size1, size2, sizes...>
-{
-public:
-    D_Layer<size1, size2> d_layer;
-    D_Network<size1, sizes...> other_layers;
-
-    explicit D_Network(D_Layer<size1, size2> d_layer_, D_Network<size2, sizes...> other_layers_) : d_layer(d_layer_),
-                                                                                                   other_layers(
-                                                                                                           other_layers_)
-    {
-
-    }
-
-    constexpr static size_t get_number_of_layers()
-    {
-        return 1 + D_Layer<size2, sizes...>::get_number_of_layers();
-    }
-
-    template<size_t i>
-    constexpr static size_t get_size()
-    {
-        if (i == 0)
-        {
-            return size1;
-        } else
-        {
-            return D_Network<size2, sizes...>::template get_size<i - 1>();
-        }
-    }
-
-    constexpr static size_t last_size()
-    {
-        return D_Network<size2, sizes...>::last_size();
-    }
-
-};
+//region NeuralNetwork
 
 template<size_t ...sizes>
-class NeuralNetwork
+class NeuralNetwork : public NeuralNetworkBase<sizes...>
 {
 
 public:
@@ -118,12 +33,8 @@ public:
 };
 
 template<size_t size1, size_t size2>
-class NeuralNetwork<size1, size2>
+class NeuralNetwork<size1, size2> : public NeuralNetworkBase<size1, size2>
 {
-private:
-
-    Matrix<double, size2, size1> first_weights;
-    Matrix<double, 1, size1> first_biases;
 
 public:
 
@@ -132,19 +43,14 @@ public:
         std::random_device rd;
         mt19937 e2(rd());
         normal_distribution<double> dist(low_bound, up_bound);
-        first_weights.iter([&](double &x)
+        this->first_weights.iter([&](double &x)
                            {
                                x = dist(e2);
                            });
-        first_biases.iter([&](double &x)
+        this->biases.iter([&](double &x)
                           {
                               x = dist(e2);
                           });
-    }
-
-    string to_string()
-    {
-        return first_weights.to_string();
     }
 
     constexpr static size_t get_number_of_layers()
@@ -157,192 +63,79 @@ public:
         return size2;
     }
 
-    Matrix<double, 1, size1> inner_predict(Matrix<double, 1, size2> input)
-    {
-        return (first_weights * input + first_biases).fmap(function(sigmoid));
-    }
-
-
     D_Layer<size1, size2>
-    compute_layer_changes(Matrix<double, 1, size2> input, Matrix<double, 1, size1> prediction,
-                          Matrix<double, 1, size1> expected_result)
+    compute_layer_changes(Vector<double, size2> input, Vector<double, size1> prediction,
+                          Vector<double, size1> expected_result)
     {
-        Matrix<double, size2, size1> each_column_is_input({input});
-        for (size_t x = 0; x < size2; x++)
-        {
-            each_column_is_input.column(x) = input;
-        }
-
         D_Layer<size1, size2> d_layer;
-        Matrix<double, size2, size1> ones({1});
-        d_layer.d_weights =
-                2 * (prediction - expected_result) * prediction.fmap(function(sigmoid_derv)) * each_column_is_input;
-
-        d_layer.d_input =
-                2 *
-                ((prediction - expected_result) * prediction.fmap(function(sigmoid_derv)) * first_weights).column_sum();
-        Matrix<double, 1, size2> d_biases =
-                2 * ((prediction - expected_result) * prediction.fmap(function(sigmoid_derv)) * ones).column_sum();
-
         return d_layer;
-
-
-    }
-
-
-    D_Network<size1, size2>
-    inner_backpropagate_one_input(tuple<Matrix<double, 1, size1>, Matrix<double, 1, size2>>
-                                  predictions, Matrix<double, 1, size1> expected_output)
-    {
-        D_Layer d_layer = compute_layer_changes(get<1>(predictions), get<0>(predictions), expected_output);
-        return D_Network<size1, size2>(d_layer);
-
     }
 };
 
 template<size_t size1, size_t size2, size_t... sizes>
-class NeuralNetwork<size1, size2, sizes...>
+class NeuralNetwork<size1, size2, sizes...> : public NeuralNetworkBase<size1, size2, sizes...>
 {
-
-    Matrix<double, size2, size1> weights;
-    Matrix<double, 1, size1> first_biases;
-    NeuralNetwork<size2, sizes...> other_layers;
-    static constexpr double learning_rate = 0.5;
-
+    using base =  NeuralNetworkBase<size1, size2, sizes...>;
+    size_t chunk_size;
 
 public:
 
-    NeuralNetwork() : other_layers()
+    NeuralNetwork()
     {
         std::random_device rd;
         mt19937 e2(rd());
         normal_distribution<double> dist(low_bound, up_bound);
-        weights.iter([&](double &x)
+        this->weights.iter([&](double &x)
                      {
-
                          x = dist(e2);
                      });
-        first_biases.iter([&](double &x)
-                          {
-                              x = dist(e2);
-                          });
+        chunk_size = 0;
     }
 
-    string to_string()
+    NeuralNetwork<size1, size2, sizes...> &operator+=(D_Network<size1, size2, sizes...> d_network)
     {
-        return weights.to_string() + "\n" + other_layers.to_string();
-    }
+        this->weights += d_network.d_layer.d_weights;
+        this->biases += d_network.d_layer.d_biases;
 
-    friend ostream &operator<<(ostream &s, NeuralNetwork<size1, size2, sizes...> n)
-    {
-        s << n.to_string();
-        return s;
-    }
+        this->other_layers += d_network.other_layers;
 
-    constexpr static size_t get_number_of_layers()
-    {
-        return 1 + NeuralNetwork<size2, sizes...>::get_number_of_layers();
-    }
-
-    template<size_t i>
-    constexpr static size_t get_size()
-    {
-        if (i == 0)
-        {
-            return size1;
-        } else
-        {
-            return NeuralNetwork<size2, sizes...>::template get_size<i - 1>();
-        }
+        return *this;
     }
 
     constexpr static size_t last_size()
     {
-        return NeuralNetwork<size2, sizes...>::last_size();
+        return NeuralNetworkBase<size1, size2, sizes...>::last_size();
     }
 
-    Matrix<double, 1, size1> predict(Matrix<double, 1, last_size()> input)
+    Vector<double, size1> predict(Vector<double, last_size()> input)
     {
-        Matrix<double, 1, size2> semi_result = other_layers.inner_predict(input);
+        Vector<double, size2> semi_result = this->other_layers.inner_predict(input);
         //cout << semi_result << endl;
-        return softmax(weights * semi_result + first_biases);
+        return softmax(this->weights * semi_result + this->biases);
     }
 
-
-    tuple<Matrix<double, 1, size1>, Matrix<double, 1, size2>, Matrix<double, 1, sizes>...>
-    feedforward(Matrix<double, 1, last_size()> input)
+    RecTuple<Vector<double, size1>, Vector<double, size2>, Vector<double, sizes>...>
+    feedforward(Vector<double, last_size()> input)
     {
-        tuple<Matrix<double, 1, size2>, Matrix<double, 1, sizes>...> semi_result = other_layers.inner_feedforward(
-                input);
-        return tuple<Matrix<double, 1, size1>, Matrix<double, 1, size2>, Matrix<double, 1, sizes>...>(
-                softmax(get<0>(semi_result) * weights + first_biases), semi_result);
+        RecTuple<Vector<double, size2>, Vector<double, sizes>...> semi_result =
+                this->other_layers.inner_feedforward(input);
+
+        return {(softmax(this->weights * (semi_result.head) + this->biases)), semi_result};
     }
 
-    template<size_t i>
-    Matrix<double, get_size<i + 1>(), get_size<i>()> get_matrix()
-    {
-        if (i == 0)
-        {
-            return weights;
-        } else
-        {
-            return other_layers.template get_size<i - 1>();
-        }
-    }
-
-    static double sq_err_loss(Matrix<double, 1, size1> prediction, Matrix<double, 1, size1> real_value)
-    {
-        return (prediction - real_value).map(function([](double x)
-                                                      { return x * x; })).sum();
-    }
-
-
-    static double cross_entropy_loss(Matrix<double, 1, size1> prediction, Matrix<double, 1, size1> real_value)
-    {
-        return -(prediction * (real_value).fmap(log)).sum();
-    }
-//protected:
-
-    Matrix<double, 1, size1> apply_one_iter(Matrix<double, 1, size2> m)
-    {
-        return (weights * m + first_biases).fmap(function(sigmoid));
-    }
-
-    Matrix<double, 1, size1> inner_predict(Matrix<double, 1, last_size()> input)
-    {
-        Matrix<double, 1, size2> semi_result = other_layers.inner_predict(input);
-        //cout << semi_result << endl;
-        return apply_one_iter(semi_result);
-    }
-
-    tuple<Matrix<double, 1, size1>, Matrix<double, 1, size2>, Matrix<double, 1, sizes>...>
-    inner_feedforward(Matrix<double, 1, last_size()> input)
-    {
-        tuple<Matrix<double, 1, size2>, Matrix<double, 1, sizes>...> semi_result = other_layers.inner_feedforward(
-                input);
-        return tuple<Matrix<double, 1, size1>, Matrix<double, 1, size2>, Matrix<double, 1, sizes>...>(
-                apply_one_iter(get<0>(semi_result)), semi_result);
-    }
+    //region protected
 
     D_Layer<size1, size2>
-    compute_layer_changes(Matrix<double, 1, size2> input, Matrix<double, 1, size1> prediction,
-                          Matrix<double, 1, size1> expected_result)
+    compute_layer_changes(Vector<double, size2> input, Vector<double, size1> prediction,
+                          Vector<double, size1> expected_result)
     {
-        Matrix<double, size2, size1> each_column_is_input({input});
-        for (size_t x = 0; x < size2; x++)
-        {
-            each_column_is_input.column(x) = input;
-        }
 
+        Vector<double, size1> a_delta = (expected_result - prediction) / (double) chunk_size;
         D_Layer<size1, size2> d_layer;
-        Matrix<double, size2, size1> ones({1});
-        d_layer.d_weights =
-                2 * (prediction - expected_result) * prediction.fmap(function(sigmoid_derv)) * each_column_is_input;
+        d_layer.d_weights = 2 * a_delta * input.transpose();
 
-        d_layer.d_input =
-                2 * ((prediction - expected_result) * prediction.fmap(function(sigmoid_derv)) * weights).column_sum();
-        Matrix<double, 1, size2> d_biases =
-                2 * ((prediction - expected_result) * prediction.fmap(function(sigmoid_derv)) * ones).column_sum();
+        d_layer.d_input = this->weights.transpose() * a_delta;
+        d_layer.d_biases = a_delta;
 
         return d_layer;
 
@@ -350,18 +143,19 @@ public:
     }
 
     D_Network<size1, size2, sizes...>
-    inner_backpropagate_one_input(tuple<Matrix<double, 1, size1>, Matrix<double, 1, size2>, Matrix<double, 1, sizes>...>
-                                  predictions, Matrix<double, 1, size1> expected_output)
+    backpropagate_one_input(
+            RecTuple<Vector<double, size1>, Vector<double, size2>, Vector<double, sizes>...> predictions,
+            Vector<double, size1> expected_output)
     {
-        D_Layer d_layer = compute_layer_changes(get<1>(predictions), get<0>(predictions), expected_output);
+        (predictions.head);
+        Vector<double, size1> a0 = (predictions.head);
 
-        tuple<Matrix<double, 1, size1>, Matrix<double, 1, sizes>...> other_predictions;
-        for (size_t x = 1; x < get_number_of_layers(); x++)
-        {
-            get<x - 1>(other_predictions) = get<x>(predictions);
-        }
-        D_Network<size2, sizes...> other_changes = other_layers.backpropagate_one_input(predictions,
-                                                                                        get<1>(predictions) -
+        Vector<double, size2> a1 = (predictions.tail).head;
+
+        D_Layer<size1, size2> d_layer = compute_layer_changes(a1, a0, expected_output);
+
+        D_Network<size2, sizes...> other_changes = this->other_layers.inner_backpropagate_one_input(predictions.tail,
+                                                                                                    predictions.tail.head -
                                                                                         d_layer.d_input);
 
         return D_Network<size1, size2, sizes...>(d_layer, other_changes);
@@ -369,13 +163,70 @@ public:
     }
 
     D_Network<size1, size2, sizes...>
-    learn(Matrix<double, 1, last_size()> input, Matrix<double, 1, size2> expected_output)
+    learn_one_input(Vector<double, last_size()> input, Vector<double, size1> expected_output)
     {
-        tuple<Matrix<double, 1, size1>, Matrix<double, 1, size2>, Matrix<double, 1, sizes>...> predictions = feedforward(
+        RecTuple<Vector<double, size1>, Vector<double, size2>, Vector<double, sizes>...> predictions = feedforward(
                 input);
-        return inner_backpropagate_one_input(predictions, expected_output);
+        return backpropagate_one_input(predictions, expected_output);
     }
+
+    void learn_one_chunk(typename vector<Vector<double, last_size()>>::iterator inputs_begin,
+                         typename vector<Vector<double, last_size()>>::iterator inputs_end,
+                         typename vector<Vector<double, size1>>::iterator expected_output_begin,
+                         typename vector<Vector<double, size1>>::iterator expected_output_end)
+    {
+        assert(inputs_end - inputs_begin == expected_output_end - expected_output_begin);
+
+        D_Network<size1, size2, sizes...> d_accumulator;
+        auto expected_output = expected_output_begin;
+        for (auto input = inputs_begin; input < inputs_end; input++, expected_output++)
+        {
+            d_accumulator += learn_one_input(*input, *expected_output);
+        }
+        d_accumulator *= learning_rate / (inputs_end - inputs_begin);
+        *this += d_accumulator;
+    }
+
+    void
+    learn(vector<Vector<double, last_size()>> inputs, vector<Vector<double, size1>> expected_output, size_t chunk_size_,
+          size_t epochs)
+    {
+        chunk_size = chunk_size_;
+        assert(inputs.size() == expected_output.size());
+        assert(chunk_size <= inputs.size());
+        assert(chunk_size <= epochs);
+        for (size_t e = 0; e < epochs;)
+        {
+            auto inputs_b1 = inputs.begin();
+            auto output_b1 = expected_output.begin();
+            auto output_b2 = output_b1 + chunk_size;
+            auto inputs_b2 = inputs_b1 + chunk_size;
+            for (; inputs_b2 <= inputs.end(); inputs_b1 += chunk_size,
+                                              inputs_b2 += chunk_size,
+                                              output_b1 += chunk_size,
+                                              output_b2 += chunk_size,
+                    e++)
+            {
+                learn_one_chunk(inputs_b1, inputs_b2, output_b1, output_b2);
+            }
+        }
+    }
+
+    double test(vector<Vector<double, last_size()>> inputs, vector<Vector<double, size1>> expected_output)
+    {
+        assert(inputs.size() == expected_output.size());
+        double acc = 0;
+        for (size_t x = 0; x < inputs.size(); x++)
+        {
+            acc += base::sq_err_loss(predict(inputs[x]), expected_output[x]);
+        }
+        int a = inputs.size();
+        return acc / inputs.size();
+    }
+
+    constexpr static double learning_rate = .5;
 };
 
+//endregion
 
 #endif //NEURAL_NETWORK_NEURALNETWORK_H

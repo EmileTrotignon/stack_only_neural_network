@@ -31,9 +31,32 @@ void test_matrix()
     cout << "Matrix tests passed." << endl;
 }
 
+void test_RecTuple()
+{
+    RecTuple<int, int> tuple0 = RecTuple<int, int>();
+    set_nth<0>(tuple0, 2);
+    set_nth<1>(tuple0, 3);
+    assert(get_nth<0>(tuple0) == 2);
+    assert(get_nth<1>(tuple0) == 3);
+
+    auto tuple1 = RecTuple<Vector<double, 4>, Vector<double, 2>, Vector<double, 3>>();
+    set_nth<0>(tuple1, Vector<double, 4>({1, 2, 3, 4}));
+    set_nth<1>(tuple1, Vector<double, 2>({3, 4}));
+    set_nth<2>(tuple1, Vector<double, 3>({1, 2, 3}));
+
+    auto g0 = get_nth<0>(tuple1);
+    assert(g0 == (Vector<double, 4>({1, 2, 3, 4})));
+    assert(get_nth<1>(tuple1) == (Vector<double, 2>({3, 4})));
+    assert(get_nth<2>(tuple1) == (Vector<double, 3>({1, 2, 3})));
+
+    cout << "Tuple tests passed" << endl;
+
+}
+
 int main()
 {
     test_matrix();
+    test_RecTuple();
     cout << "All tests passed." << endl;
     return 0;
 }
