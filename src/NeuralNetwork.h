@@ -16,7 +16,7 @@
 #include "Matrix.h"
 #include "relevant_math.h"
 #include "RecTuple.h"
-#include "DNetwork.h"
+#include "DeltaNetwork.h"
 #include "NeuralNetworkBase.h"
 #include "NeuralNetworkInside.h"
 using namespace std;
@@ -35,7 +35,18 @@ public:
 template<size_t size1, size_t size2>
 class NeuralNetwork<size1, size2> : public NeuralNetworkBase<size1, size2>
 {
+//region constexpr static
+    constexpr static size_t get_number_of_layers()
+    {
+        return 1;
+    };
 
+    constexpr static size_t last_size()
+    {
+        return size2;
+    }
+//endregion
+//region constructors
 public:
 
     NeuralNetwork()
@@ -53,33 +64,36 @@ public:
                           });
     }
 
-    constexpr static size_t get_number_of_layers()
-    {
-        return 1;
-    };
-
-    constexpr static size_t last_size()
-    {
-        return size2;
-    }
-
-    D_Layer<size1, size2>
-    compute_layer_changes(Vector<double, size2> input, Vector<double, size1> prediction,
+//endregion
+//region methods
+    DeltaLayer<size1, size2>
+    compute_layer_changes(Vector<double, size2> input,
+                          Vector<double, size1> prediction,
                           Vector<double, size1> expected_result)
     {
-        D_Layer<size1, size2> d_layer;
+        DeltaLayer<size1, size2> d_layer;
         return d_layer;
     }
+//endregion
 };
 
 template<size_t size1, size_t size2, size_t... sizes>
 class NeuralNetwork<size1, size2, sizes...> : public NeuralNetworkBase<size1, size2, sizes...>
 {
+//region constexpr static
     using base =  NeuralNetworkBase<size1, size2, sizes...>;
+
+    constexpr static size_t last_size()
+    {
+        return NeuralNetworkBase<size1, size2, sizes...>::last_size();
+    }
+
+//endregion
+//region members
     size_t chunk_size;
-
+//endregion
+//region constructors
 public:
-
     NeuralNetwork()
     {
         std::random_device rd;
@@ -91,8 +105,11 @@ public:
                      });
         chunk_size = 0;
     }
+//endregion
 
-    NeuralNetwork<size1, size2, sizes...> &operator+=(D_Network<size1, size2, sizes...> d_network)
+//region operators
+
+    NeuralNetwork<size1, size2, sizes...> &operator+=(const DeltaNetwork<size1, size2, sizes...> &d_network)
     {
         this->weights += d_network.d_layer.d_weights;
         this->biases += d_network.d_layer.d_biases;
@@ -102,12 +119,11 @@ public:
         return *this;
     }
 
-    constexpr static size_t last_size()
-    {
-        return NeuralNetworkBase<size1, size2, sizes...>::last_size();
-    }
+//endregion
 
-    Vector<double, size1> predict(Vector<double, last_size()> input)
+//region methods
+
+    Vector<double, size1> predict(Vector<double, last_size()> input) const
     {
         Vector<double, size2> semi_result = this->other_layers.inner_predict(input);
         //cout << semi_result << endl;
@@ -115,7 +131,7 @@ public:
     }
 
     RecTuple<Vector<double, size1>, Vector<double, size2>, Vector<double, sizes>...>
-    feedforward(Vector<double, last_size()> input)
+    feedforward(Vector<double, last_size()> input) const
     {
         RecTuple<Vector<double, size2>, Vector<double, sizes>...> semi_result =
                 this->other_layers.inner_feedforward(input);
@@ -123,16 +139,14 @@ public:
         return {(softmax(this->weights * (semi_result.head) + this->biases)), semi_result};
     }
 
-    //region protected
-
-    D_Layer<size1, size2>
+    DeltaLayer<size1, size2>
     compute_layer_changes(Vector<double, size2> input, Vector<double, size1> prediction,
-                          Vector<double, size1> expected_result)
+                          Vector<double, size1> expected_result) const
     {
 
         Vector<double, size1> a_delta = (expected_result - prediction) / (double) chunk_size;
-        D_Layer<size1, size2> d_layer;
-        d_layer.d_weights = 2 * a_delta * input.transpose();
+        DeltaLayer<size1, size2> d_layer;
+        d_layer.d_weights = a_delta * input.transpose();
 
         d_layer.d_input = this->weights.transpose() * a_delta;
         d_layer.d_biases = a_delta;
@@ -142,27 +156,26 @@ public:
 
     }
 
-    D_Network<size1, size2, sizes...>
+    DeltaNetwork<size1, size2, sizes...>
     backpropagate_one_input(
             RecTuple<Vector<double, size1>, Vector<double, size2>, Vector<double, sizes>...> predictions,
-            Vector<double, size1> expected_output)
+            Vector<double, size1> expected_output) const
     {
-        (predictions.head);
         Vector<double, size1> a0 = (predictions.head);
 
         Vector<double, size2> a1 = (predictions.tail).head;
 
-        D_Layer<size1, size2> d_layer = compute_layer_changes(a1, a0, expected_output);
+        DeltaLayer<size1, size2> d_layer = compute_layer_changes(a1, a0, expected_output);
 
-        D_Network<size2, sizes...> other_changes = this->other_layers.inner_backpropagate_one_input(predictions.tail,
+        DeltaNetwork<size2, sizes...> other_changes = this->other_layers.inner_backpropagate_one_input(predictions.tail,
                                                                                                     predictions.tail.head -
                                                                                         d_layer.d_input);
 
-        return D_Network<size1, size2, sizes...>(d_layer, other_changes);
+        return DeltaNetwork<size1, size2, sizes...>(d_layer, other_changes);
 
     }
 
-    D_Network<size1, size2, sizes...>
+    DeltaNetwork<size1, size2, sizes...>
     learn_one_input(Vector<double, last_size()> input, Vector<double, size1> expected_output)
     {
         RecTuple<Vector<double, size1>, Vector<double, size2>, Vector<double, sizes>...> predictions = feedforward(
@@ -177,13 +190,13 @@ public:
     {
         assert(inputs_end - inputs_begin == expected_output_end - expected_output_begin);
 
-        D_Network<size1, size2, sizes...> d_accumulator;
+        DeltaNetwork<size1, size2, sizes...> d_accumulator;
         auto expected_output = expected_output_begin;
         for (auto input = inputs_begin; input < inputs_end; input++, expected_output++)
         {
             d_accumulator += learn_one_input(*input, *expected_output);
         }
-        d_accumulator *= learning_rate / (inputs_end - inputs_begin);
+        d_accumulator *= base::learning_rate / (inputs_end - inputs_begin);
         *this += d_accumulator;
     }
 
@@ -212,21 +225,27 @@ public:
         }
     }
 
-    double test(vector<Vector<double, last_size()>> inputs, vector<Vector<double, size1>> expected_output)
+    double test(vector<Vector<double, last_size()>> inputs, vector<Vector<double, size1>> expected_output) const
     {
         assert(inputs.size() == expected_output.size());
         double acc = 0;
         for (size_t x = 0; x < inputs.size(); x++)
         {
-            acc += base::sq_err_loss(predict(inputs[x]), expected_output[x]);
+            auto prediction = predict(inputs[x]);
+            cout << Matrix<double, 2, 10>({prediction, expected_output[x]}) << endl;
+            cout << get<1>(prediction.max_index()) << " ";
+            cout << get<1>(expected_output[x].max_index()) << endl;
+            //cout << prediction << endl;
+            //cout << expected_output[x] << endl << endl;
+            acc += prediction.max_index() == expected_output[x].max_index() ? (cout << "good" << endl), 1
+                                                                            : 0; //base::sq_err_loss(predict(inputs[x]), expected_output[x]);
         }
         int a = inputs.size();
         return acc / inputs.size();
     }
 
-    constexpr static double learning_rate = .5;
-};
-
 //endregion
+
+};
 
 #endif //NEURAL_NETWORK_NEURALNETWORK_H

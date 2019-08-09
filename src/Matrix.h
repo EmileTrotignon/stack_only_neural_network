@@ -19,12 +19,19 @@ template<class T, size_t H> using Vector = Matrix<T, 1, H>;
 
 template<class T, size_t W> using RowVector = Matrix<T, W, 1>;
 
-
 template<class T, size_t W, size_t H>
 class Matrix
 {
+
+//region members
+
 private:
     array<array<T, H>, W> arr;
+
+//endregion
+
+//region constructor
+
 public:
     Matrix() = default;
 
@@ -45,6 +52,21 @@ public:
         other.arr = nullptr;
     }
 
+    explicit Matrix(array<Vector<T, H>, W> am)
+    {
+        for (size_t x = 0; x < W; x++)
+        {
+            for (size_t y = 0; y < H; y++)
+            {
+                at(x, y) = am.at(x).at(0, y);
+            }
+        }
+    }
+
+//endregion
+
+//region operators
+
     Matrix<T, W, H> &operator=(const Matrix<T, W, H> &other) noexcept
     {
         for (size_t x = 0; x < W; x++)
@@ -62,61 +84,6 @@ public:
         arr = other.arr;
         other.arr = array<array<T, H>, W>();;
         return *this;
-    }
-
-    explicit Matrix(array<Matrix<T, 1, H>, W> am)
-    {
-        for (size_t x = 0; x < W; x++)
-        {
-            for (size_t y = 0; y < H; y++)
-            {
-                arr.at(x, y) = am.at(x).at(1, y);
-            }
-        }
-    }
-
-    T at(size_t x, size_t y) const
-    {
-        return arr.at(x).at(y);
-    }
-
-    T &at(size_t x, size_t y)
-    {
-        return arr.at(x).at(y);
-    }
-
-    array<T, H> column(size_t x) const
-    {
-        return arr.at(x);
-    }
-
-
-    array<T, H> &column(size_t x)
-    {
-        return arr.at(x);
-    }
-
-    array<T, W> line(size_t y) const
-    {
-        array<T, W> r;
-        for (size_t x = 0; x < W; x++)
-        {
-            r.at(x) = at(x, y);
-        }
-        return r;
-    }
-
-    Matrix<T, H, W> transpose()
-    {
-        Matrix<T, H, W> r;
-        for (size_t x = 0; x < W; x++)
-        {
-            for (size_t y = 0; y < H; y++)
-            {
-                r.at(y, x) = at(x, y);
-            }
-        }
-        return r;
     }
 
 
@@ -174,7 +141,7 @@ public:
     }
 
     template<size_t W_>
-    Matrix<T, W_, H> operator*(const Matrix<T, W_, W> &other)
+    Matrix<T, W_, H> operator*(const Matrix<T, W_, W> &other) const
     {
         Matrix<T, W_, H> r;
         for (size_t x = 0; x < W_; x++)
@@ -191,7 +158,7 @@ public:
         return r;
     }
 
-    Matrix<T, W, H> operator/(T other)
+    Matrix<T, W, H> operator/(T other) const
     {
         Matrix<T, W, H> r;
         for (size_t x = 0; x < W; x++)
@@ -199,6 +166,60 @@ public:
             for (size_t y = 0; y < H; y++)
             {
                 r.at(x, y) = at(x, y) / other;
+            }
+        }
+        return r;
+    }
+
+    friend ostream &operator<<(ostream &s, const Matrix<T, W, H> &m)
+    {
+        s << m.to_string();
+        return s;
+    }
+
+//endregion
+
+//region methods
+
+    T at(size_t x, size_t y) const
+    {
+        return arr.at(x).at(y);
+    }
+
+    T &at(size_t x, size_t y)
+    {
+        return arr.at(x).at(y);
+    }
+
+    array<T, H> column(size_t x) const
+    {
+        return arr.at(x);
+    }
+
+
+    array<T, H> &column(size_t x)
+    {
+        return arr.at(x);
+    }
+
+    array<T, W> line(size_t y) const
+    {
+        array<T, W> r;
+        for (size_t x = 0; x < W; x++)
+        {
+            r.at(x) = at(x, y);
+        }
+        return r;
+    }
+
+    Matrix<T, H, W> transpose() const
+    {
+        Matrix<T, H, W> r;
+        for (size_t x = 0; x < W; x++)
+        {
+            for (size_t y = 0; y < H; y++)
+            {
+                r.at(y, x) = at(x, y);
             }
         }
         return r;
@@ -215,12 +236,6 @@ public:
             }
         }
         return r;
-    }
-
-    friend ostream &operator<<(ostream &s, const Matrix<T, W, H> &m)
-    {
-        s << m.to_string();
-        return s;
     }
 
     template<class R>
@@ -298,6 +313,25 @@ public:
         return fold<T>(function([](T prec_max, T val)
                                 { return (val > prec_max) ? val : prec_max; }), at(0, 0));
 
+    }
+
+    [[nodiscard]] tuple<size_t, size_t> max_index() const
+    {
+
+        size_t mx = 0;
+        size_t my = 0;
+        for (size_t x = 0; x < W; x++)
+        {
+            for (size_t y = 0; y < H; y++)
+            {
+                if (at(x, y) > at(mx, my))
+                {
+                    mx = x;
+                    my = y;
+                }
+            }
+        }
+        return {mx, my};
     }
 
     T sum() const

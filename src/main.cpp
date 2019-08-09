@@ -13,7 +13,7 @@ get_dataset()
     RecTuple<int> t = RecTuple<int>();
     t.head = 1;
     auto a = t.head;
-    auto raw_data = mnist::read_dataset(100, 100);
+    auto raw_data = mnist::read_dataset(10000, 1000);
 
     mnist::normalize_dataset(raw_data);
 
@@ -68,7 +68,7 @@ int main()
     vector<Matrix<double, 1, 10>> test_outputs = get<3>(dataset);
 
     auto network = NeuralNetwork<10, 128, 784>();
-    network.learn(inputs, outputs, 2, 1000);
+    network.learn(inputs, outputs, 10, 1000);
     cout << network.test(test_inputs, test_outputs);
     //tuple<vector<Matrix<double, 1, 784>>, vector<Matrix<double, 1, 10>>> dataset = get_dataset();
 
