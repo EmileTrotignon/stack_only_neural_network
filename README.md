@@ -11,4 +11,4 @@ This also means that if you want to change the number of layers or their size, y
 
 This project has two main goals :
 - Get an understanding of how a neural network works.
-- Learn advanced C++ concepts (template metaprogramming and move semantics).
+- Learn advanced C++ concepts (template metaprogramming, threading, and move semantics).
