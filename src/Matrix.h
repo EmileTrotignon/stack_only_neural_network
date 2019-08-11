@@ -8,6 +8,7 @@
 #include <iostream>
 #include <array>
 #include <functional>
+#include <memory>
 
 using namespace std;
 
@@ -26,29 +27,55 @@ class Matrix
 //region members
 
 private:
-    array<array<T, H>, W> arr;
+    unique_ptr<array<array<T, H>, W>> arr;
 
 //endregion
 
 //region constructor
 
 public:
-    Matrix() = default;
-
-    explicit Matrix(array<array<T, H>, W> arr_) : arr(arr_)
+    Matrix() : arr(new array<array<T, H>, W>())
     {
+        //arr = new array<array<T, H>, W>();
+    };
 
+private:
+
+    template<size_t x, size_t y, class R, class... Rs>
+    void constructor_helper(R v, Rs... vs)
+    {
+        at(x, y) = v;
+        if constexpr (y != H - 1)
+        {
+            constructor_helper<x, y + 1, Rs...>(vs...);
+        } else if constexpr (x != W - 1)
+        {
+            constructor_helper<x + 1, 0, Rs...>(vs...);
+        }
     }
 
-    Matrix(const Matrix<T, W, H> &other)
+public:
+    template<class... Rs>
+    explicit Matrix(Rs... v) : Matrix()
     {
-        arr = array<array<T, H>, W>();
-        std::copy(other.arr.begin(), other.arr.end(), arr.begin());
+        static_assert(sizeof...(Rs) == W * H);
+        constructor_helper<0, 0, Rs...>(v...);
     }
 
-    explicit Matrix(Matrix<T, H, W> &&other)
+    /*explicit Matrix(const array<array<T, H>, W> &arr_) : Matrix()
     {
-        arr = other.arr();
+        &arr = arr_;
+    }*/
+
+    Matrix(const Matrix<T, W, H> &other) : Matrix()
+    {
+        std::copy(other.arr->begin(), other.arr->end(), arr->begin());
+    }
+
+    explicit Matrix(Matrix<T, H, W> &&other) : Matrix()
+    {
+        arr.swap(other.arr);
+        //delete other.arr;
         other.arr = nullptr;
     }
 
@@ -62,7 +89,12 @@ public:
             }
         }
     }
-
+/*
+    ~Matrix()
+    {
+        delete arr;
+    }
+*/
 //endregion
 
 //region operators
@@ -79,10 +111,12 @@ public:
         return *this;
     }
 
+
     Matrix<T, W, H> &operator=(Matrix<T, W, H> &&other) noexcept
     {
-        arr = other.arr;
-        other.arr = array<array<T, H>, W>();;
+        swap(arr, other.arr);
+        //delete other.arr;
+        other.arr = nullptr;;
         return *this;
     }
 
@@ -183,23 +217,23 @@ public:
 
     T at(size_t x, size_t y) const
     {
-        return arr.at(x).at(y);
+        return arr->at(x).at(y);
     }
 
     T &at(size_t x, size_t y)
     {
-        return arr.at(x).at(y);
+        return arr->at(x).at(y);
     }
 
     array<T, H> column(size_t x) const
     {
-        return arr.at(x);
+        return arr->at(x);
     }
 
 
     array<T, H> &column(size_t x)
     {
-        return arr.at(x);
+        return arr->at(x);
     }
 
     array<T, W> line(size_t y) const
@@ -278,11 +312,11 @@ public:
     R fold(function<R(R, T)> f, R first_value) const
     {
         R r = first_value;
-        for (auto i:arr)
+        for (size_t x = 0; x < W; x++)
         {
-            for (T j:i)
+            for (size_t y = 0; y < H; y++)
             {
-                r = f(r, j);
+                r = f(r, at(x, y));
             }
         }
         return r;
@@ -429,6 +463,9 @@ public:
             r.column(x) = column.column(0);
         }
     }
+
+//endregion
+
 };
 
 #endif //NEURAL_NETWORK_MATRIX_H

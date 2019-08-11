@@ -120,7 +120,7 @@ public:
         return DeltaNetwork(d_layer + other.d_layer, other_layers + other.other_layers);
     }
 
-    DeltaNetwork<size1, size2, sizes...> &operator+=(DeltaNetwork<size1, size2, sizes...> other)
+    DeltaNetwork<size1, size2, sizes...> &operator+=(const DeltaNetwork<size1, size2, sizes...> &other)
     {
 
         d_layer += other.d_layer;

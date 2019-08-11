@@ -24,6 +24,12 @@ class RecTuple<T>
 {
 public:
     T head;
+
+    RecTuple() = default;
+
+    explicit RecTuple(const T &head_) : head(head_)
+    {
+    }
 };
 
 template<class head_T, class... tail_Ts>
@@ -33,6 +39,16 @@ public:
     head_T head;
     RecTuple<tail_Ts...> tail;
 
+    RecTuple() = default;
+
+    RecTuple(const RecTuple<head_T, tail_Ts...> &other) : head(other.head), tail(other.tail)
+    {
+    }
+
+    RecTuple(const head_T &head_, const RecTuple<tail_Ts...> &tail_) : head(head_), tail(tail_)
+    {
+
+    }
 };
 
 template<size_t x, class T, class...Ts>

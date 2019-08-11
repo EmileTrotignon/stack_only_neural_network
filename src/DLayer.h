@@ -45,7 +45,7 @@ public:
     {
 
     }
-
+/*
     DeltaLayer(Matrix<double, size2, size1> &&d_weights_,
                Vector<double, size2> &&d_input_,
                Vector<double, size2> &&d_biases_) : d_weights(d_weights_),
@@ -54,6 +54,7 @@ public:
     {
 
     }
+*/
 //endregion
 //region operators
 public :

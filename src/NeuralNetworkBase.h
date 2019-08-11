@@ -14,6 +14,8 @@
 #include <random>
 #include <cmath>
 #include <cassert>
+#include <filesystem>
+#include <fstream>
 #include "Matrix.h"
 #include "relevant_math.h"
 #include "RecTuple.h"
@@ -23,6 +25,10 @@ using namespace std;
 
 constexpr static double low_bound = -1;
 constexpr static double up_bound = 1;
+
+template<size_t W, size_t H> using DMatrix = Matrix<double, W, H>;
+template<size_t H> using DVector = Vector<double, H>;
+
 
 template<size_t ...sizes>
 class NeuralNetworkInside;
@@ -41,8 +47,8 @@ class NeuralNetworkBase<size1, size2>
 //region members
 
 protected:
-    Matrix<double, size2, size1> weights;
-    Vector<double, size1> biases;
+    DMatrix<size2, size1> weights;
+    DVector<size1> biases;
 
 //endregion
 
@@ -113,7 +119,7 @@ class NeuralNetworkBase<size1, size2, sizes...>
 //region constexpr static
 
 protected :
-    static constexpr double learning_rate = 0.5;
+    static constexpr double learning_rate = 0.1;
 
 public:
     constexpr static size_t get_number_of_layers()
@@ -142,9 +148,12 @@ public:
 
 //region members
 
+public:
+    constexpr static size_t max_number_of_cores = 16;
+
 protected:
-    Matrix<double, size2, size1> weights;
-    Vector<double, size1> biases;
+    DMatrix<size2, size1> weights;
+    DVector<size1> biases;
     NeuralNetworkInside<size2, sizes...> other_layers;
 
 //endregion
@@ -159,9 +168,22 @@ public:
         normal_distribution<double> dist(low_bound, up_bound);
         weights.iter([&](double &x)
                      {
-
                          x = dist(e2);
                      });
+    }
+
+//endregion
+
+//region factories
+
+public:
+    static NeuralNetworkBase<size1, size2, sizes...> deserialize(const filesystem::path &path)
+    {
+        ifstream file;
+        file.open(path, ios_base::binary);
+        NeuralNetworkBase<size1, size2, sizes...> r;
+        file >> r;
+        return r;
     }
 
 //endregion
@@ -178,11 +200,11 @@ public:
         return *this;
     }
 
-    friend ostream &operator<<(ostream &s, const NeuralNetworkBase<size1, size2, sizes...> &n)
+    /*friend ostream &operator<<(ostream &s, const NeuralNetworkBase<size1, size2, sizes...> &n)
     {
         s << n.to_string();
         return s;
-    }
+    }*/
 
 //endregion
 
@@ -204,6 +226,33 @@ public:
         {
             return other_layers.template get_size<i - 1>();
         }
+    }
+
+    void serialize(const filesystem::path &path)
+    {
+        ofstream file;
+        file.open(path, ios_base::binary);
+        file << *this;
+    }
+
+//endregion
+
+//region static
+
+    static double sq_err_loss(DVector<size1> prediction, DVector<size1> real_value)
+    {
+        return (real_value - prediction).fmap(function([](double x)
+                                                       { return x * x; })).sum();
+    }
+
+    static double cross_entropy_loss(DVector<size1> prediction, DVector<size1> real_value)
+    {
+        return -(prediction * (real_value).fmap(log)).sum();
+    }
+
+    static double right_or_wrong_loss(DVector<size1> prediction, DVector<size1> real_value)
+    {
+        return real_value.max_index() == prediction.max_index() ? 1 : 0;
     }
 
 //endregion
