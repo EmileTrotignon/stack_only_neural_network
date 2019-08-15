@@ -35,6 +35,8 @@ class NeuralNetworkInside<size1, size2> : public NeuralNetworkBase<size1, size2>
 
 //region constexpr static
 
+    using base =  NeuralNetworkBase<size1, size2>;
+
 public:
     constexpr static size_t get_number_of_layers()
     {
@@ -52,20 +54,8 @@ public:
 
 public:
 
-    NeuralNetworkInside()
+    NeuralNetworkInside() : base()
     {
-
-        std::random_device rd;
-        mt19937 e2(rd());
-        normal_distribution<double> dist(low_bound, up_bound);
-        this->weights.iter([&](double &x)
-                           {
-                               x = dist(e2);
-                           });
-        this->biases.iter([&](double &x)
-                          {
-                              x = dist(e2);
-                          });
     }
 
 //endregion
@@ -122,6 +112,8 @@ class NeuralNetworkInside<size1, size2, sizes...> : public NeuralNetworkBase<siz
 
 //region constexpr static
 
+    using base =  NeuralNetworkBase<size1, size2, sizes...>;
+
     constexpr static size_t get_number_of_layers()
     {
         return 1 + NeuralNetworkInside<size2, sizes...>::get_number_of_layers();
@@ -146,27 +138,11 @@ class NeuralNetworkInside<size1, size2, sizes...> : public NeuralNetworkBase<siz
 
 //endregion
 
-//region members
-
-    DMatrix<size2, size1> weights;
-    DVector<size1> biases;
-    NeuralNetworkInside<size2, sizes...> other_layers;
-
-//endregion
-
 //region constructors
 
 public:
-    NeuralNetworkInside() : other_layers(), biases(MatrixFactory::uniform<double, 1, size1>(0))
+    NeuralNetworkInside() : base()
     {
-        std::random_device rd;
-        mt19937 e2(rd());
-        normal_distribution<double> dist(low_bound, up_bound);
-        weights.iter([&](double &x)
-                     {
-
-                         x = dist(e2);
-                     });
     }
 //endregion
 
@@ -174,14 +150,14 @@ public:
 
     DVector<size1> apply_one_iter(const DVector<size2> &m) const
     {
-        return (weights * m + biases).fmap(function(sigmoid));
+        return (this->weights * m + this->biases).fmap(function(sigmoid));
     }
 
     RecTuple<DVector<size1>, DVector<size2>, DVector<sizes>...>
     inner_feedforward(const DVector<last_size()> &input) const
     {
         RecTuple<DVector<size2>, DVector<sizes>...>
-                semi_result = other_layers.inner_feedforward(input);
+                semi_result = this->other_layers.inner_feedforward(input);
         auto r = apply_one_iter(semi_result.head);
 
         //if constexpr (tuple_size<)
@@ -190,7 +166,7 @@ public:
 
     DVector<size1> inner_predict(const DVector<last_size()> &input) const
     {
-        DVector<size2> semi_result = other_layers.inner_predict(input);
+        DVector<size2> semi_result = this->other_layers.inner_predict(input);
         return apply_one_iter(semi_result);
     }
 
@@ -220,8 +196,8 @@ public:
     {
         DeltaLayer d_layer = compute_layer_changes(predictions.tail.head, predictions.head, expected_output);
 
-        DeltaNetwork<size2, sizes...> other_changes = other_layers.inner_backpropagate_one_input(predictions.tail,
-                                                                                              (predictions.tail.head) -
+        DeltaNetwork<size2, sizes...> other_changes = this->other_layers.inner_backpropagate_one_input(predictions.tail,
+                                                                                                       (predictions.tail.head) +
                                                                                               d_layer.d_input);
 
         return DeltaNetwork<size1, size2, sizes...>(d_layer, other_changes);

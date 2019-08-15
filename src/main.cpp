@@ -58,7 +58,7 @@ void get_dataset(vector<Matrix<double, 1, 784>> &inputs, vector<Matrix<double, 1
 
 int main()
 {
-    vector<Matrix<double, 1, 784>> inputs;
+    /*vector<Matrix<double, 1, 784>> inputs;
     vector<Matrix<double, 1, 10>> outputs;
 
     vector<Matrix<double, 1, 784>> test_inputs;
@@ -68,9 +68,20 @@ int main()
     getrlimit(RLIMIT_STACK, &rlim);
     cout << rlim.rlim_cur << endl;
     auto network = new NeuralNetwork<10, 100, 1000, 784>();
-    network->learn(inputs, outputs, 20, 2000);
-    cout << network->test(test_inputs, test_outputs);
+    network->learn(inputs, outputs, 100, 2000);
+    cout << network->test(test_inputs, test_outputs);*/
     //tuple<vector<Matrix<double, 1, 784>>, vector<Matrix<double, 1, 10>>> dataset = get_dataset();
 
+    vector<DVector<2>> inputs;
+    vector<DVector<2>> outputs;
+    for (size_t i = 0; i < 10000; i++)
+    {
+        DVector<2> v(i % 2, (i + 1) % 2);
+        inputs.push_back(v);
+        outputs.push_back(v);
+    }
+    auto network = NeuralNetwork<2, 4, 2>();
+    cout << network.to_string() << endl;
+    network.learn(inputs, outputs, 10, 1000);
     return 0;
 }

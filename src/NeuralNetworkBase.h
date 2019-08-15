@@ -57,18 +57,14 @@ protected:
 public:
     NeuralNetworkBase()
     {
-
         std::random_device rd;
         mt19937 e2(rd());
         normal_distribution<double> dist(low_bound, up_bound);
-        weights.iter([&](double &x)
-                     {
-                         x = dist(e2);
-                     });
-        biases.iter([&](double &x)
-                    {
-                        x = dist(e2);
-                    });
+        this->weights.iter([&](double &x)
+                           {
+                               x = dist(e2);
+                           });
+        this->biases = MatrixFactory::uniform<double, 1, size1>(0);
     }
 
 //endregion
@@ -76,10 +72,10 @@ public:
 //region operators
 
 public:
-    NeuralNetworkBase<size1, size2> &operator+=(DeltaNetwork<size1, size2> d_network)
+    NeuralNetworkBase<size1, size2> &operator-=(DeltaNetwork<size1, size2> d_network)
     {
-        weights += d_network.d_layer.d_weights;
-        biases += d_network.d_layer.d_biases;
+        weights -= d_network.d_layer.d_weights;
+        biases -= d_network.d_layer.d_biases;
         return *this;
     }
 
@@ -88,9 +84,10 @@ public:
 //region methods
 
 public:
-    string to_string()
+    [[nodiscard]] string to_string() const
     {
-        return weights.to_string();
+        return "Layer :\n\nWeights :\n" + weights.to_string() + "\nBiases:\n\n" + biases.to_string();
+
     }
 
 //endregion
@@ -191,11 +188,11 @@ public:
 //region operators
 
 public:
-    NeuralNetworkBase<size1, size2, sizes...> &operator+=(const DeltaNetwork<size1, size2, sizes...> &d_network)
+    NeuralNetworkBase<size1, size2, sizes...> &operator-=(const DeltaNetwork<size1, size2, sizes...> &d_network)
     {
-        weights += d_network.d_layer.d_weights;
-        biases += d_network.d_layer.d_biases;
-        other_layers += d_network.other_layers;
+        weights -= d_network.d_layer.d_weights;
+        biases -= d_network.d_layer.d_biases;
+        other_layers -= d_network.other_layers;
 
         return *this;
     }
@@ -213,7 +210,8 @@ public:
 
     [[nodiscard]] string to_string() const
     {
-        return weights.to_string() + "\n" + other_layers.to_string();
+        return "Layer :\nWeights :\n" + weights.to_string() + "\nBiases:\n" + biases.to_string() +
+               other_layers.to_string() + "\n\n";
     }
 
     template<size_t i>

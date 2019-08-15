@@ -35,10 +35,11 @@ public:
     NeuralNetwork() = delete;
 };
 
+/*
 template<size_t size1, size_t size2>
 class NeuralNetwork<size1, size2> : public NeuralNetworkBase<size1, size2>
 {
-
+using base =  NeuralNetworkBase<size1, size2>;
 //region constexpr static
 
     constexpr static size_t get_number_of_layers()
@@ -57,19 +58,8 @@ class NeuralNetwork<size1, size2> : public NeuralNetworkBase<size1, size2>
 
 public:
 
-    NeuralNetwork()
+    NeuralNetwork() : base()
     {
-        std::random_device rd;
-        mt19937 e2(rd());
-        normal_distribution<double> dist(low_bound, up_bound);
-        this->first_weights.iter([&](double &x)
-                           {
-                               x = dist(e2);
-                           });
-        this->biases.iter([&](double &x)
-                          {
-                              x = dist(e2);
-                          });
     }
 
 //endregion
@@ -88,7 +78,7 @@ public:
 //endregion
 
 };
-
+*/
 template<size_t size1, size_t size2, size_t... sizes>
 class NeuralNetwork<size1, size2, sizes...> : public NeuralNetworkBase<size1, size2, sizes...>
 {
@@ -108,15 +98,8 @@ class NeuralNetwork<size1, size2, sizes...> : public NeuralNetworkBase<size1, si
 //region constructors
 
 public:
-    NeuralNetwork()
+    NeuralNetwork() : base()
     {
-        std::random_device rd;
-        mt19937 e2(rd());
-        normal_distribution<double> dist(low_bound, up_bound);
-        this->weights.iter([&](double &x)
-                     {
-                         x = dist(e2);
-                     });
     }
 
 //endregion
@@ -163,18 +146,15 @@ public:
             Vector<double, sizes>...> predictions,
                             const Vector<double, size1> &expected_output) const
     {
-        Vector<double, size1> a0 = (predictions.head);
 
-        Vector<double, size2> a1 = (predictions.tail).head;
-
-        DeltaLayer<size1, size2> d_layer = compute_layer_changes(a1, a0, expected_output);
+        DeltaLayer<size1, size2> d_layer = compute_layer_changes((predictions.tail).head, predictions.head,
+                                                                 expected_output);
 
         DeltaNetwork<size2, sizes...> other_changes = this->other_layers.inner_backpropagate_one_input(predictions.tail,
-                                                                                                    predictions.tail.head -
-                                                                                        d_layer.d_input);
+                                                                                                       predictions.tail.head +
+                                                                                                       d_layer.d_input);
 
         return DeltaNetwork<size1, size2, sizes...>(d_layer, other_changes);
-
     }
 
     tuple<DeltaNetwork<size1, size2, sizes...>, double>
@@ -182,8 +162,9 @@ public:
     {
         RecTuple<DVector<size1>, DVector<size2>, DVector<sizes>...> predictions = feedforward(
                 input);
+        //cout << predictions.head.to_string()  << endl;
         return {backpropagate_one_input(predictions, expected_output),
-                base::right_or_wrong_loss(predictions.head, expected_output)};;
+                base::sq_err_loss(predictions.head, expected_output)};;
     }
 
     void learn_one_chunk(typename vector<DVector<last_size()>>::const_iterator inputs_begin,
@@ -192,15 +173,14 @@ public:
                          typename vector<DVector<size1>>::const_iterator expected_output_end)
     {
         assert(inputs_end - inputs_begin == expected_output_end - expected_output_begin);
-
         DeltaNetwork<size1, size2, sizes...> d_accumulator;
         double error_accumulator = 0;
         auto expected_output = expected_output_begin;
         for (auto input = inputs_begin;
              input < inputs_end;
-             input += base::max_number_of_cores, expected_output += base::max_number_of_cores)
+             input++, expected_output++)//= base::max_number_of_cores, expected_output += base::max_number_of_cores)
         {
-            array<future<tuple<DeltaNetwork<size1, size2, sizes...>, double>>, base::max_number_of_cores> future_learns;
+            /*array<future<tuple<DeltaNetwork<size1, size2, sizes...>, double>>, base::max_number_of_cores> future_learns;
             for (size_t core = 0; core < base::max_number_of_cores && (input + core) < inputs_end; core++)
             {
 
@@ -215,14 +195,16 @@ public:
                 d_accumulator += get<0>(r);
                 error_accumulator += get<1>(r);
             }
-            /*auto learn = learn_one_input(*input, *expected_output);
+            */
+            auto learn = learn_one_input(*input, *expected_output);
             d_accumulator += get<0>(learn);
-            error_accumulator += get<1>(learn);*/
+            error_accumulator += get<1>(learn);
+
         }
         cout << error_accumulator / (inputs_end - inputs_begin) << endl;
         //for_each(std::execution::par_unseq, )
         d_accumulator *= base::learning_rate / (inputs_end - inputs_begin);
-        *this += d_accumulator;
+        *this -= d_accumulator;
     }
 
     void learn(const vector<DVector<last_size()>> &inputs,
@@ -247,6 +229,7 @@ public:
                     e++)
             {
                 //if (inputs_b1 - in)
+                //cout << this->to_string() << endl;
 
                 learn_one_chunk(inputs_b1, inputs_b2, output_b1, output_b2);
             }

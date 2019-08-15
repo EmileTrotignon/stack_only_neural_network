@@ -151,6 +151,11 @@ public:
         return *this = *this + other;
     }
 
+    Matrix<T, W, H> &operator-=(const Matrix<T, W, H> &other)
+    {
+        return *this = *this - other;
+    }
+
     Matrix<T, W, H> &operator*=(double x)
     {
         return *this = x * *this;
@@ -385,7 +390,7 @@ public:
         return transpose().column_sum();
     }
 
-    [[nodiscard]] string to_string() const
+    string to_string() const
     {
         array<string, H> lines;
         size_t max_len = 0;
