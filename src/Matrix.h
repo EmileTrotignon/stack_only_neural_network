@@ -27,16 +27,23 @@ class Matrix
 //region members
 
 private:
+#ifndef MAKE_STACK_ONLY
     unique_ptr<array<array<T, H>, W>> arr;
+#else
+    array<array<T, H>, W> arr;
+#endif
 
 //endregion
 
 //region constructor
 
 public:
-    Matrix() : arr(new array<array<T, H>, W>())
+    Matrix() : arr(
+#ifndef MAKE_STACK_ONLY
+            new array<array<T, H>, W>()
+#endif
+    )
     {
-        //arr = new array<array<T, H>, W>();
     };
 
 private:
@@ -69,15 +76,22 @@ public:
 
     Matrix(const Matrix<T, W, H> &other) : Matrix()
     {
+#ifndef MAKE_STACK_ONLY
         std::copy(other.arr->begin(), other.arr->end(), arr->begin());
+#else
+        std::copy(other.arr.begin(), other.arr.end(), arr.begin());
+#endif
     }
 
+#ifndef MAKE_STACK_ONLY
     explicit Matrix(Matrix<T, H, W> &&other) : Matrix()
     {
         arr.swap(other.arr);
         //delete other.arr;
         other.arr = nullptr;
     }
+
+#endif
 
     explicit Matrix(array<Vector<T, H>, W> am)
     {
@@ -111,7 +125,7 @@ public:
         return *this;
     }
 
-
+#ifndef MAKE_STACK_ONLY
     Matrix<T, W, H> &operator=(Matrix<T, W, H> &&other) noexcept
     {
         swap(arr, other.arr);
@@ -119,6 +133,8 @@ public:
         other.arr = nullptr;;
         return *this;
     }
+
+#endif
 
 
     bool operator==(Matrix<T, W, H> other) const
@@ -222,23 +238,39 @@ public:
 
     T at(size_t x, size_t y) const
     {
+#ifndef MAKE_STACK_ONLY
         return arr->at(x).at(y);
+#else
+        return arr.at(x).at(y);
+#endif
     }
 
     T &at(size_t x, size_t y)
     {
+#ifndef MAKE_STACK_ONLY
         return arr->at(x).at(y);
+#else
+        return arr.at(x).at(y);
+#endif
     }
 
     array<T, H> column(size_t x) const
     {
+#ifndef MAKE_STACK_ONLY
         return arr->at(x);
+#else
+        return arr.at(x);
+#endif
     }
 
 
     array<T, H> &column(size_t x)
     {
+#ifndef MAKE_STACK_ONLY
         return arr->at(x);
+#else
+        return arr.at(x);
+#endif
     }
 
     array<T, W> line(size_t y) const
@@ -390,7 +422,7 @@ public:
         return transpose().column_sum();
     }
 
-    string to_string() const
+    [[nodiscard]] string to_string() const
     {
         array<string, H> lines;
         size_t max_len = 0;

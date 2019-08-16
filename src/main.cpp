@@ -4,6 +4,7 @@
 #include <ctime>
 #include <sys/resource.h>
 
+#define MAKE_STACK_ONLY
 #include "NeuralNetwork.h"
 #include <tuple>
 
