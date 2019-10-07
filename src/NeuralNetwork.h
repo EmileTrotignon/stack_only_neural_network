@@ -98,7 +98,7 @@ class NeuralNetwork<size1, size2, sizes...> : public NeuralNetworkBase<size1, si
 //region constructors
 
 public:
-    NeuralNetwork() : base()
+    NeuralNetwork(mt19937 &e2) : base(e2)
     {
     }
 
@@ -125,10 +125,11 @@ public:
     DeltaLayer<size1, size2>
     compute_layer_changes(const Vector<double, size2> &input,
                           const Vector<double, size1> &prediction,
-                          const Vector<double, size1> &expected_result) const
+                          const Vector<double, size1> &expected_result,
+                          size_t chunk_size) const
     {
 
-        Vector<double, size1> a_delta = (expected_result - prediction);
+        Vector<double, size1> a_delta = (prediction - expected_result) / chunk_size;
         DeltaLayer<size1, size2> d_layer;
         d_layer.d_weights = a_delta * input.transpose();
 
@@ -136,35 +137,34 @@ public:
         d_layer.d_biases = a_delta;
 
         return d_layer;
-
-
     }
 
     DeltaNetwork<size1, size2, sizes...>
-    backpropagate_one_input(const RecTuple<Vector<double, size1>,
-            Vector<double, size2>,
-            Vector<double, sizes>...> predictions,
-                            const Vector<double, size1> &expected_output) const
+    backpropagate_one_input(const RecTuple<DVector<size1>, DVector<size2>, DVector<sizes>...> predictions,
+                            const DVector<size1> &expected_output,
+                            size_t chunk_size) const
     {
 
-        DeltaLayer<size1, size2> d_layer = compute_layer_changes((predictions.tail).head, predictions.head,
-                                                                 expected_output);
+        DeltaLayer<size1, size2> d_layer = compute_layer_changes((predictions.tail).head,
+                                                                 predictions.head,
+                                                                 expected_output,
+                                                                 chunk_size);
 
-        DeltaNetwork<size2, sizes...> other_changes = this->other_layers.inner_backpropagate_one_input(predictions.tail,
-                                                                                                       predictions.tail.head +
-                                                                                                       d_layer.d_input);
+        DeltaNetwork<size2, sizes...> other_changes =
+                this->other_layers.inner_backpropagate_one_input(predictions.tail,
+                                                                 predictions.tail.head + d_layer.d_input,
+                                                                 chunk_size);
 
         return DeltaNetwork<size1, size2, sizes...>(d_layer, other_changes);
     }
 
     tuple<DeltaNetwork<size1, size2, sizes...>, double>
-    learn_one_input(const DVector<last_size()> &input, const DVector<size1> &expected_output)
+    learn_one_input(const DVector<last_size()> &input, const DVector<size1> &expected_output, size_t chunk_size) const
     {
-        RecTuple<DVector<size1>, DVector<size2>, DVector<sizes>...> predictions = feedforward(
-                input);
+        RecTuple<DVector<size1>, DVector<size2>, DVector<sizes>...> predictions = feedforward(input);
         //cout << predictions.head.to_string()  << endl;
-        return {backpropagate_one_input(predictions, expected_output),
-                base::sq_err_loss(predictions.head, expected_output)};;
+        return {backpropagate_one_input(predictions, expected_output, chunk_size),
+                base::right_or_wrong_loss(predictions.head, expected_output)};;
     }
 
     void learn_one_chunk(typename vector<DVector<last_size()>>::const_iterator inputs_begin,
@@ -172,21 +172,25 @@ public:
                          typename vector<DVector<size1>>::const_iterator expected_output_begin,
                          typename vector<DVector<size1>>::const_iterator expected_output_end)
     {
-        assert(inputs_end - inputs_begin == expected_output_end - expected_output_begin);
+        size_t chunk_size = inputs_end - inputs_begin;
+        assert(chunk_size == expected_output_end - expected_output_begin);
         DeltaNetwork<size1, size2, sizes...> d_accumulator;
         double error_accumulator = 0;
         auto expected_output = expected_output_begin;
         for (auto input = inputs_begin;
              input < inputs_end;
-             input++, expected_output++)//= base::max_number_of_cores, expected_output += base::max_number_of_cores)
+             input += base::max_number_of_cores, expected_output += base::max_number_of_cores)
         {
-            /*array<future<tuple<DeltaNetwork<size1, size2, sizes...>, double>>, base::max_number_of_cores> future_learns;
+            array<future<tuple<DeltaNetwork<size1, size2, sizes...>, double>>, base::max_number_of_cores> future_learns;
             for (size_t core = 0; core < base::max_number_of_cores && (input + core) < inputs_end; core++)
             {
 
 
-                const auto async_callback = bind(&this_Type::learn_one_input, this, ref(*(input + core)),
-                                                 ref(*(expected_output + core)));
+                const auto async_callback = bind(&this_Type::learn_one_input,
+                                                 this,
+                                                 ref(*(input + core)),
+                                                 ref(*(expected_output + core)),
+                                                 chunk_size);
                 future_learns.at(core) = async(async_callback);
             }
             for (size_t core = 0; core < base::max_number_of_cores && (input + core) < inputs_end; core++)
@@ -195,15 +199,16 @@ public:
                 d_accumulator += get<0>(r);
                 error_accumulator += get<1>(r);
             }
-            */
+
+            /*
             auto learn = learn_one_input(*input, *expected_output);
             d_accumulator += get<0>(learn);
             error_accumulator += get<1>(learn);
-
+            */
         }
         cout << error_accumulator / (inputs_end - inputs_begin) << endl;
         //for_each(std::execution::par_unseq, )
-        d_accumulator *= base::learning_rate / (inputs_end - inputs_begin);
+        d_accumulator *= base::learning_rate;// / (inputs_end - inputs_begin);
         *this -= d_accumulator;
     }
 

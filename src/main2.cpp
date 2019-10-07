@@ -424,7 +424,7 @@ int main(int argc, const char *argv[])
         W2 = W2 - lr * dW2;
         W1 = W1 - lr * dW1;
 
-
+        cout << "i : " << i << endl;
         if ((i + 1) % 100 == 0)
         {
             cout << "-----------------------------------------------Epoch " << i + 1

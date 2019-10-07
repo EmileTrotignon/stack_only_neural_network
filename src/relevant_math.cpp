@@ -16,3 +16,9 @@ double sigmoid_derv(double x_sigmoid)
     return x_sigmoid * (1 - x_sigmoid);
 }
 
+double mylog(double x)
+{
+    return log(x);
+}
+
+

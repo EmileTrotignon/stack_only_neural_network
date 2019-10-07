@@ -12,7 +12,7 @@ double sigmoid(double input);
 double sigmoid_derv(double sigmoid_x);
 
 template<size_t H>
-Matrix<double, 1, H> softmax(Matrix<double, 1, H> m)
+DVector<H> softmax(Matrix<double, 1, H> m)
 {
     double max = m.max();
     auto r = m.fmap(function([=](double x)
@@ -23,4 +23,5 @@ Matrix<double, 1, H> softmax(Matrix<double, 1, H> m)
 
 }
 
+double mylog(double x);
 #endif //NEURAL_NETWORK_RELEVANT_MATH_H

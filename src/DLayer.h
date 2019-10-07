@@ -31,9 +31,9 @@ public:
 //region constructors
 public:
 
-    DeltaLayer() : d_weights(MatrixFactory::uniform<double, size2, size1>(0)),
-                   d_input(MatrixFactory::uniform<double, 1, size2>(0)),
-                   d_biases(MatrixFactory::uniform<double, 1, size1>(0))
+    DeltaLayer() : d_weights(Matrix<double, size2, size1>::uniform(0)),
+                   d_input(Matrix<double, 1, size2>::uniform(0)),
+                   d_biases(Matrix<double, 1, size1>::uniform(0))
     {
     }
 

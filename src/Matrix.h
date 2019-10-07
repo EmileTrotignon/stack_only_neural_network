@@ -9,6 +9,7 @@
 #include <array>
 #include <functional>
 #include <memory>
+#include <random>
 
 using namespace std;
 
@@ -19,6 +20,11 @@ class Matrix;
 template<class T, size_t H> using Vector = Matrix<T, 1, H>;
 
 template<class T, size_t W> using RowVector = Matrix<T, W, 1>;
+
+template<size_t W, size_t H> using DMatrix = Matrix<double, W, H>;
+
+template<size_t H> using DVector = Vector<double, H>;
+
 
 template<class T, size_t W, size_t H>
 class Matrix
@@ -35,16 +41,19 @@ private:
 
 //endregion
 
-//region constructor
+//region constructors
 
 public:
-    Matrix() : arr(
 #ifndef MAKE_STACK_ONLY
-            new array<array<T, H>, W>()
-#endif
-    )
+
+    Matrix() : arr(new array<array<T, H>, W>())
     {
     };
+#else
+    Matrix() : arr()
+    {
+    };
+#endif
 
 private:
 
@@ -76,11 +85,13 @@ public:
 
     Matrix(const Matrix<T, W, H> &other) : Matrix()
     {
-#ifndef MAKE_STACK_ONLY
-        std::copy(other.arr->begin(), other.arr->end(), arr->begin());
-#else
-        std::copy(other.arr.begin(), other.arr.end(), arr.begin());
-#endif
+        for (size_t x = 0; x < W; x++)
+        {
+            for (size_t y = 0; y < H; y++)
+            {
+                at(x, y) = other.at(x, y);
+            }
+        }
     }
 
 #ifndef MAKE_STACK_ONLY
@@ -103,12 +114,41 @@ public:
             }
         }
     }
-/*
-    ~Matrix()
+
+//endregion
+
+//region factories
+public:
+    static Matrix<T, H, W> uniform_columns(Vector<T, H> column)
     {
-        delete arr;
+        Matrix<T, H, W> r;
+        for (size_t x = 0; x < W; x++)
+        {
+            r.column(x) = column.column(0);
+        }
     }
-*/
+
+    static Matrix<T, W, H> uniform(T val)
+    {
+        Matrix<T, W, H> r;
+        r.iter([=](T &x)
+               {
+                   x = val;
+               });
+        return r;
+    }
+
+    static Matrix<double, W, H> random(mt19937 &e2, double low_bound, double up_bound)
+    {
+        DMatrix<W, H> r;
+        normal_distribution<double> dist(low_bound, up_bound);
+        r.iter([&](double &x)
+               {
+                   x = dist(e2);
+               });
+        return r;
+    }
+
 //endregion
 
 //region operators
@@ -133,7 +173,6 @@ public:
         other.arr = nullptr;;
         return *this;
     }
-
 #endif
 
 
@@ -229,6 +268,18 @@ public:
     friend ostream &operator<<(ostream &s, const Matrix<T, W, H> &m)
     {
         s << m.to_string();
+        return s;
+    }
+
+    friend istream &operator>>(istream &s, Matrix<T, W, H> &m)
+    {
+        for (size_t x = 0; x < W; x++)
+        {
+            for (size_t y = 0; y < H; y++)
+            {
+                s >> m.at(x, y);
+            }
+        }
         return s;
     }
 
@@ -451,6 +502,9 @@ public:
         }
         return r;
     }
+
+    //endregion
+
 };
 
 template<class T, size_t W, size_t H>
@@ -460,24 +514,22 @@ Matrix<T, W, H> operator*(double x, Matrix<T, W, H> m)
                            { return y * x; }));
 }
 
-class MatrixFactory
+/*
+template<class T, size_t N> class Matrix<T, 1, N>
 {
-public:
-    template<class T, size_t W, size_t H>
-    static Matrix<double, W, H> uniform(T val)
+    T at(size_t i) const
     {
-        Matrix<T, W, H> r;
-        for (size_t x = 0; x < W; x++)
-        {
-            for (size_t y = 0; y < H; y++)
-            {
-                r.at(x, y) = val;
-            }
-        }
-        return r;
+        return at(0, i);
     }
 
-    template<size_t N>
+    T &at(size_t i)
+    {
+        return at(0, i);
+    }
+};
+
+template<class T, size_t N> class Matrix<T, N, N>
+{
     static Matrix<double, N, N> diagonal(double val)
     {
         Matrix<double, N, N> r;
@@ -490,19 +542,7 @@ public:
         }
 
     }
-
-    template<class T, size_t H, size_t W>
-    static Matrix<T, H, W> uniform_columns(Vector<T, H> column)
-    {
-        Matrix<T, H, W> r;
-        for (size_t x = 0; x < W; x++)
-        {
-            r.column(x) = column.column(0);
-        }
-    }
-
-//endregion
-
 };
+ */
 
 #endif //NEURAL_NETWORK_MATRIX_H
