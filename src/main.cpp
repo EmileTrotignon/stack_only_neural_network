@@ -7,7 +7,8 @@
 //#define MAKE_STACK_ONLY
 #include "Matrix.h"
 
-#include "NeuralNetwork.h"
+#include "NeuralNetworkBpg.h"
+#include "GenePool.h"
 #include <tuple>
 
 using namespace std;
@@ -115,11 +116,52 @@ int main()
     vector<DVector<64>> test_inputs;
     vector<DVector<10>> test_outputs;
     get_dataset(inputs, outputs, test_inputs, test_outputs);
-    std::random_device rd;
+    std::random_device rd = std::random_device();
+    cout << rd() << endl;
     mt19937 e2(rd());
-    auto network = NeuralNetwork<10, 128, 64>(e2);
-    network.learn(inputs, outputs, 100, 20000);
-    cout << network.test(test_inputs, test_outputs);
+    //NeuralNetworkBasic<10, 64> network = random_factory<NeuralNetworkBasic, 10, 128, 64>(e2, 0, 1);
+    GenePool<100, 10, 10, 64> pool;
+    pool.evaluate_pool(inputs, outputs, 500, 16);
+    auto eval = pool.get_evaluation();
+    for (auto i:eval)
+    {
+        cout << i << ", ";
+    }
+    cout << endl;
+    pool.sort_pool();
+
+    for (size_t j = 0; j < 10000; j++)
+    {
+        pool.sort_pool();
+        eval = pool.get_evaluation();
+        double s = 0;
+        for (auto i:eval)
+        {
+            //    cout << i << ", ";
+            s += i;
+        }
+        cout << j << " : " << s << endl;
+        pool.set_to_next_generation(inputs, outputs, 0.1, 0.3, 100, 16);
+    }
+
+
+    /*
+    for (size_t j = 0; j < 10; j++)
+    {
+        pool.sort_pool();
+        auto eval = pool.evaluate_pool(inputs, outputs, 10);
+        double s = 0;
+        for (auto i:eval)
+        {
+            cout << i << ", ";
+            s += i;
+        }
+        cout << endl << s << endl;
+        pool.set_to_next_generation(inputs, outputs, 0.1, 0.1, 20);
+    }
+    */
+    //network.learn(inputs, outputs, 100, 20000);
+    //cout << network.test(test_inputs, test_outputs);
     //tuple<vector<Matrix<double, 1, 784>>, vector<Matrix<double, 1, 10>>> dataset = get_dataset();
 /*
     vector<DVector<2>> inputs;

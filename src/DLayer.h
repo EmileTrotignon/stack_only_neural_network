@@ -39,9 +39,17 @@ public:
 
     DeltaLayer(const Matrix<double, size2, size1> &d_weights_,
                const Vector<double, size2> &d_input_,
-               const Vector<double, size2> &d_biases_) : d_weights(d_weights_),
+               const Vector<double, size1> &d_biases_) : d_weights(d_weights_),
                                                          d_biases(d_biases_),
                                                          d_input(d_input_)
+    {
+
+    }
+
+    DeltaLayer(const Matrix<double, size2, size1> &d_weights_,
+               const Vector<double, size1> &d_biases_) : d_weights(d_weights_),
+                                                         d_biases(d_biases_),
+                                                         d_input(Matrix<double, 1, size2>::uniform(0))
     {
 
     }

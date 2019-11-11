@@ -5,6 +5,7 @@
 #include <iostream>
 #include <cassert>
 #include "NeuralNetwork.h"
+//#include "Matrixtibo.h"
 
 using namespace std;
 
@@ -29,6 +30,11 @@ void test_matrix()
                            { return x + 1; })) == b___);
     //cout << b.to_string() << endl;
     //cout << (b * a).to_string() << endl;
+    std::random_device rd = std::random_device();
+    mt19937 e2(rd());
+
+    Matrix<double, 5, 5> randm = Matrix<double, 5, 5>::random(e2, -1, 1);
+
     cout << "Matrix tests passed." << endl;
 }
 
@@ -54,10 +60,24 @@ void test_RecTuple()
 
 }
 
+/*= default;
+void test_MatrixTibo()
+{
+    double v[] = {1, 1, 1, 1};
+    Matrix A = Matrix(2, 2);
+    A.setValues(v);
+    Matrix B = Matrix(2, 2);
+    B.setValues(v);
+    Matrix C = A + B;
+    Matrix D = A * 2;
+    assert(A + B == A * 2);
+}
+*/
 int main()
 {
     test_matrix();
     test_RecTuple();
+    //test_MatrixTibo();
     cout << "All tests passed." << endl;
     return 0;
 }

@@ -5,7 +5,6 @@
 #ifndef NEURAL_NETWORK_NEURALNETWORKBASE_H
 #define NEURAL_NETWORK_NEURALNETWORKBASE_H
 
-
 #include <iostream>
 #include <array>
 #include <variant>
@@ -23,56 +22,73 @@
 
 using namespace std;
 
-constexpr static double low_bound = -1;
-constexpr static double up_bound = 1;
-
 template<size_t W, size_t H> using DMatrix = Matrix<double, W, H>;
 template<size_t H> using DVector = Vector<double, H>;
 
+//template<typename NeuralNetworkT, size_t... sizes>
+//NeuralNetworkT random_factory(const mt19937 &e2);
 
-template<size_t ...sizes>
-class NeuralNetworkInside;
-
-template<size_t ...sizes>
+template<template<size_t...> typename NeuralNetworkInsideT, size_t ...sizes>
 class NeuralNetworkBase final
 {
-public:
-    NeuralNetworkBase() = delete;
 };
 
-template<size_t size1, size_t size2>
-class NeuralNetworkBase<size1, size2>
+template<template<size_t...> typename NeuralNetworkInsideT, size_t size1, size_t size2>
+class NeuralNetworkBase<NeuralNetworkInsideT, size1, size2>
 {
+
+//region constexpr static
+
+public:
+
+    using this_t = NeuralNetworkBase<NeuralNetworkInsideT, size1, size2>;
+    using weights_t = DMatrix<size2, size1>;
+    using biases_t = DVector<size1>;
+
+    constexpr static size_t get_number_of_layers()
+    {
+        return 1;
+    };
+
+    constexpr static size_t last_size()
+    {
+        return size2;
+    }
+
+    using input_t = DVector<last_size()>;
+    using output_t = DVector<size1>;
+
+//endregion
 
 //region members
 
-protected:
+public:
     DMatrix<size2, size1> weights;
     DVector<size1> biases;
 
 //endregion
 
 //region constructors
-
 public:
-    NeuralNetworkBase()
+    NeuralNetworkBase(DMatrix<size2, size1> weights_, DVector<size1> biases_) : weights(weights_), biases(biases_)
     {
-        std::random_device rd;
-        mt19937 e2(rd());
-        normal_distribution<double> dist(low_bound, up_bound);
-        this->weights.iter([&](double &x)
-                           {
-                               x = dist(e2);
-                           });
-        this->biases = MatrixFactory::uniform<double, 1, size1>(0);
     }
 
+    NeuralNetworkBase() : weights(), biases()
+    {};
 //endregion
 
 //region operators
 
 public:
-    NeuralNetworkBase<size1, size2> &operator-=(DeltaNetwork<size1, size2> d_network)
+    this_t &operator+=(DeltaNetwork<size1, size2> d_network)
+    {
+        weights += d_network.d_layer.d_weights;
+        biases += d_network.d_layer.d_biases;
+        return *this;
+    }
+
+    this_t &operator-=(DeltaNetwork<size1, size2> d_network)
     {
         weights -= d_network.d_layer.d_weights;
         biases -= d_network.d_layer.d_biases;
@@ -92,33 +108,23 @@ public:
 
 //endregion
 
-//region constexpr static
-
-public:
-    constexpr static size_t get_number_of_layers()
-    {
-        return 1;
-    };
-
-    constexpr static size_t last_size()
-    {
-        return size2;
-    }
-
-//endregion
+    //friend this_t random_factory<NeuralNetworkBase, size1, size2>(mt19937 &);
 
 };
 
-template<size_t size1, size_t size2, size_t... sizes>
-class NeuralNetworkBase<size1, size2, sizes...>
+template<template<size_t...> typename NeuralNetworkInsideT, size_t size1, size_t size2, size_t... sizes>
+class NeuralNetworkBase<NeuralNetworkInsideT, size1, size2, sizes...>
 {
 
 //region constexpr static
 
-protected :
-    static constexpr double learning_rate = 0.1;
-
 public:
+    using this_t = NeuralNetworkBase<NeuralNetworkInsideT, size1, size2, sizes...>;
+    using other_layers_t = NeuralNetworkInsideT<size2, sizes...>;
+    using weights_t = DMatrix<size2, size1>;
+    using biases_t = DVector<size1>;
+    static constexpr double learning_rate = 0.5;
+
     constexpr static size_t get_number_of_layers()
     {
         return 2 + sizeof...(sizes); //1 + NeuralNetworkBase<size2, sizes...>::get_number_of_layers();
@@ -132,14 +138,17 @@ public:
             return size1;
         } else
         {
-            return NeuralNetworkBase<size2, sizes...>::template NeuralNetworkBase<i - 1>();
+            return other_layers_t::template NeuralNetworkBase<i - 1>();
         }
     }
 
     constexpr static size_t last_size()
     {
-        return NeuralNetworkBase<size2, sizes...>::last_size();
+        return other_layers_t::last_size();
     }
+
+    using input_t = DVector<last_size()>;
+    using output_t = DVector<size1>;
 
 //endregion
 
@@ -148,47 +157,62 @@ public:
 public:
     constexpr static size_t max_number_of_cores = 16;
 
-protected:
+public:
     DMatrix<size2, size1> weights;
     DVector<size1> biases;
-    NeuralNetworkInside<size2, sizes...> other_layers;
+    other_layers_t other_layers;
 
 //endregion
 
 //region constructors
 
 public:
-    NeuralNetworkBase() : other_layers(), biases(MatrixFactory::uniform<double, 1, size1>(0))
+    NeuralNetworkBase(DMatrix<size2, size1> weights_, DVector<size1> biases_, other_layers_t other_layers_) :
+            weights(weights_), biases(biases_), other_layers(other_layers_)
     {
-        std::random_device rd;
-        mt19937 e2(rd());
-        normal_distribution<double> dist(low_bound, up_bound);
-        weights.iter([&](double &x)
-                     {
-                         x = dist(e2);
-                     });
     }
+
+    NeuralNetworkBase(DMatrix<size2, size1> weights_, DVector<size1> biases_) : weights(weights_), biases(biases_)
+    {
+        assert(false);
+    }
+
+    NeuralNetworkBase() : weights(), biases(), other_layers()
+    {};
 
 //endregion
 
 //region factories
 
 public:
-    static NeuralNetworkBase<size1, size2, sizes...> deserialize(const filesystem::path &path)
+    static this_t deserialize(const filesystem::path &path)
     {
         ifstream file;
         file.open(path, ios_base::binary);
-        NeuralNetworkBase<size1, size2, sizes...> r;
+        this_t r;
         file >> r;
+
+        int x;
         return r;
     }
+
+
 
 //endregion
 
 //region operators
 
 public:
-    NeuralNetworkBase<size1, size2, sizes...> &operator-=(const DeltaNetwork<size1, size2, sizes...> &d_network)
+    this_t &operator+=(const DeltaNetwork<size1, size2, sizes...> &d_network)
+    {
+        weights += d_network.d_layer.d_weights;
+        biases += d_network.d_layer.d_biases;
+        other_layers += d_network.other_layers;
+
+        return *this;
+    }
+
+    this_t &operator-=(const DeltaNetwork<size1, size2, sizes...> &d_network)
     {
         weights -= d_network.d_layer.d_weights;
         biases -= d_network.d_layer.d_biases;
@@ -243,18 +267,101 @@ public:
                                                        { return x * x; })).sum();
     }
 
-    static double cross_entropy_loss(DVector<size1> prediction, DVector<size1> real_value)
+    /*static double cross_entropy_loss(DVector<size1> prediction, DVector<size1> real_value)
     {
-        return -(prediction * (real_value).fmap(log)).sum();
-    }
+        return -((real_value.fmap(function(mylog))) * prediction).sum();
+    }*/
 
     static double right_or_wrong_loss(DVector<size1> prediction, DVector<size1> real_value)
     {
-        return real_value.max_index() == prediction.max_index() ? 1 : 0;
+        return real_value.max_index() == prediction.max_index() ? 0 : 1;
     }
 
 //endregion
 
+    //friend this_t random_factory<NeuralNetworkBase, size1, size2, sizes...>(mt19937 &);
+
 };
+
+template<size_t... sizes>
+class NeuralNetworkBasic : public NeuralNetworkBase<NeuralNetworkBasic, sizes...>
+{
+
+};
+
+template<size_t size1, size_t size2>
+class NeuralNetworkBasic<size1, size2> : public NeuralNetworkBase<NeuralNetworkBasic, size1, size2>
+{
+    using this_t =  NeuralNetworkBasic<size1, size2>;
+public:
+
+    NeuralNetworkBasic(DMatrix<size2, size1> weights_, DVector<size1> biases_) :
+            NeuralNetworkBase<NeuralNetworkBasic, size1, size2>(weights_, biases_)
+    {}
+
+    NeuralNetworkBasic() : NeuralNetworkBase<NeuralNetworkBasic, size1, size2>()
+    {}
+    /*static this_t random_weights(const mt19937 &e2)
+    {
+        this_t r;
+        r.weights = DMatrix<size2, size1>::random(e2, mean, variance);
+        r.biases = DVector<size1>::uniform(0);
+        return r;
+    }*/
+};
+
+template<size_t size1, size_t size2, size_t... sizes>
+class NeuralNetworkBasic<size1, size2, sizes...> : public NeuralNetworkBase<NeuralNetworkBasic, size1, size2, sizes...>
+{
+public:
+    using this_t = NeuralNetworkBasic<size1, size2, sizes...>;
+    using other_layers_t = NeuralNetworkBasic<size2, sizes...>;
+public:
+
+    NeuralNetworkBasic(DMatrix<size2, size1> weights_, DVector<size1> biases_, other_layers_t other_layers_) :
+            NeuralNetworkBase<NeuralNetworkBasic, size1, size2, sizes...>(weights_, biases_, other_layers_)
+    {}
+
+    NeuralNetworkBasic() : NeuralNetworkBase<NeuralNetworkBasic, size1, size2, sizes...>()
+    {}
+
+};
+
+//template<template<size_t... sizes_> typename NeuralNetworkT, size_t... sizes>
+//NeuralNetworkT<sizes...> random_factory(const mt19937 &e2);
+
+
+
+template<typename NeuralNetworkT, size_t size1, size_t size2>
+NeuralNetworkT random_helper(mt19937 &e2, double mean, double variance, double biases_mean, double biases_variance)
+{
+    auto biases = NeuralNetworkT::biases_t::random(e2, biases_mean, biases_variance);
+    auto weights = NeuralNetworkT::weights_t::random(e2, mean, variance);
+    return NeuralNetworkT(weights, biases);
+}
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "InfiniteRecursion" //yeah boi its not actually infinite
+
+template<typename NeuralNetworkT, size_t size1, size_t size2, size_t size3, size_t... sizes>
+NeuralNetworkT random_helper(mt19937 &e2, double mean, double variance, double biases_mean, double biases_variance)
+{
+    auto biases = NeuralNetworkT::biases_t::random(e2, biases_mean, biases_variance);
+    auto weights = NeuralNetworkT::weights_t::random(e2, mean, variance);
+    auto other_layers = random_helper<typename NeuralNetworkT::other_layers_t, size2, size3, sizes...>(e2, mean,
+                                                                                                       variance,
+                                                                                                       biases_mean,
+                                                                                                       biases_variance);
+    return NeuralNetworkT(weights, biases, other_layers);
+}
+
+#pragma clang diagnostic pop
+
+template<template<size_t... sizes> typename NeuralNetworkTemplate, size_t... sizes>
+NeuralNetworkTemplate<sizes...> random_factory(mt19937 &e2, double mean, double variance,
+                                               double biases_mean = 0, double biases_variance = 0)
+{
+    return random_helper<NeuralNetworkTemplate<sizes...>, sizes...>(e2, mean, variance, biases_mean, biases_variance);
+}
 
 #endif //NEURAL_NETWORK_NEURALNETWORKBASE_H

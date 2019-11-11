@@ -31,6 +31,8 @@ public:
         return size2;
     }
 
+    using weights_t = DMatrix<size2, size1>;
+    using biases_t = DVector<size1>;
 //endregion
 
 //region members
@@ -46,6 +48,11 @@ public:
     DeltaNetwork() = default;
 
     explicit DeltaNetwork(DeltaLayer<size1, size2> d_layer_) : d_layer(d_layer_)
+    {
+
+    }
+
+    DeltaNetwork(DMatrix<size2, size1> weights_, DVector<size1> biases_) : d_layer(weights_, biases_)
     {
 
     }
@@ -89,6 +96,14 @@ template<size_t size1, size_t size2, size_t... sizes>
 class DeltaNetwork<size1, size2, sizes...>
 {
 
+//region static constexpr
+
+public:
+    using weights_t = DMatrix<size2, size1>;
+    using biases_t = DVector<size1>;
+    using other_layers_t = DeltaNetwork<size2, sizes...>;
+//endregion
+
 //region members
 
 public:
@@ -102,10 +117,14 @@ public:
 
     DeltaNetwork() = default;
 
-    explicit DeltaNetwork(DeltaLayer<size1, size2> d_layer_, DeltaNetwork<size2, sizes...> other_layers_) : d_layer(
-            d_layer_),
-                                                                                                            other_layers(
-                                                                                                           other_layers_)
+    DeltaNetwork(DeltaLayer<size1, size2> d_layer_, DeltaNetwork<size2, sizes...> other_layers_) : d_layer(
+            d_layer_), other_layers(other_layers_)
+    {
+
+    }
+
+    DeltaNetwork(DMatrix<size2, size1> weights_, DVector<size1> biases_, DeltaNetwork<size2, sizes...> other_layers_)
+            : d_layer(weights_, biases_), other_layers(other_layers_)
     {
 
     }

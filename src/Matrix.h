@@ -94,6 +94,7 @@ public:
         }
     }
 
+
 #ifndef MAKE_STACK_ONLY
     explicit Matrix(Matrix<T, H, W> &&other) : Matrix()
     {
@@ -118,6 +119,7 @@ public:
 //endregion
 
 //region factories
+
 public:
     static Matrix<T, H, W> uniform_columns(Vector<T, H> column)
     {
@@ -138,10 +140,10 @@ public:
         return r;
     }
 
-    static Matrix<double, W, H> random(mt19937 &e2, double low_bound, double up_bound)
+    static Matrix<double, W, H> random(mt19937 &e2, double mean, double variance)
     {
         DMatrix<W, H> r;
-        normal_distribution<double> dist(low_bound, up_bound);
+        normal_distribution<double> dist(mean, variance);
         r.iter([&](double &x)
                {
                    x = dist(e2);
@@ -176,7 +178,7 @@ public:
 #endif
 
 
-    bool operator==(Matrix<T, W, H> other) const
+    bool operator==(const Matrix<T, W, H> &other) const
     {
         for (size_t x = 0; x < W; x++)
         {

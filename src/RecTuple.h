@@ -47,7 +47,6 @@ public:
 
     RecTuple(const head_T &head_, const RecTuple<tail_Ts...> &tail_) : head(head_), tail(tail_)
     {
-
     }
 };
 
